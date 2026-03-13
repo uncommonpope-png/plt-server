@@ -39,5 +39,14 @@ app.post('/webhook', (req, res) => {
   res.json({ ok: true });
 });
 
+// Seshat posts replies here after responding
+app.post('/reply', (req, res) => {
+  const { text, secret } = req.body;
+  if (secret !== (process.env.REPLY_SECRET || 'plt2026')) return res.status(403).json({ ok: false });
+  if (!text) return res.json({ ok: false });
+  chat.push({ id: msgId++, who: 'seshat', text, time: new Date().toISOString() });
+  res.json({ ok: true });
+});
+
 app.get('/', (req, res) => res.send('PLT Server OK'));
 app.listen(process.env.PORT || 3000, () => console.log('PLT Server running'));
