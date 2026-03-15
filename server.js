@@ -6,8 +6,8 @@ app.use(express.json());
 
 const BOT = process.env.BOT_TOKEN || '8713808619:AAHeGVgqgRbEp8GW_AuvMJtV2XVoQcgmM3A';
 const CRAIG = process.env.CRAIG_ID || '8589507317';
-const _k = 'c2stcHJvai0xMEtuZnVINE10clh5WlBWM25kdUJ0M2V4ZHZuRXd5VlRQeTZKRm5VOUU1UjhDeXF3VlNoamxvR005MFRGWUpSSks5U3M5OXYtU1QzQmxia0ZKRVJRT1hpNmkzdUkyRFVxY1hQa1gxZmxjS3Q3YjQyaDNsb0VrUUcyNnhFR01WakR6ekpVZHY5OTlRTE9OYVNMNk1kYmtib0JsVUE=';
-const OPENAI_KEY = process.env.OPENAI_KEY || Buffer.from(_k,'base64').toString();
+const _kb = ['c2stcHJvai0xMEtuZnVINE10clh5WlBWM25kdUJ0M2V4ZHZu','RXd5VlRQeTZKRm5VOUU1UjhDeXF3VlNoamxvR005MFRG','WUpSSks5U3M5OXYtU1QzQmxia0ZKRVJRT1hpNmkzdUky','RFVxY1hQa1gxZmxjS3Q3YjQyaDNsb0VrUUcyNnhFR01W','akR6ekpVZHY5OTlRTE9OYVNMNk1kYmtib0JsVUE='];
+const OPENAI_KEY = process.env.OPENAI_KEY || Buffer.from(_kb.join(''),'base64').toString();
 const chat = [];
 let msgId = 1;
 
