@@ -6,12 +6,11 @@ app.use(express.json());
 
 const BOT = process.env.BOT_TOKEN || '8713808619:AAHeGVgqgRbEp8GW_AuvMJtV2XVoQcgmM3A';
 const CRAIG = process.env.CRAIG_ID || '8589507317';
-const _kb = ['c2stcHJvai0xMEtuZnVINE10clh5WlBWM25kdUJ0M2V4ZHZu','RXd5VlRQeTZKRm5VOUU1UjhDeXF3VlNoamxvR005MFRG','WUpSSks5U3M5OXYtU1QzQmxia0ZKRVJRT1hpNmkzdUky','RFVxY1hQa1gxZmxjS3Q3YjQyaDNsb0VrUUcyNnhFR01W','akR6ekpVZHY5OTlRTE9OYVNMNk1kYmtib0JsVUE='];
-const OPENAI_KEY = process.env.OPENAI_KEY || Buffer.from(_kb.join(''),'base64').toString();
+const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
+const OPENAI_KEY = process.env.OPENAI_KEY;
 const chat = [];
 let msgId = 1;
 
-// Betty Credits system prompt
 const BETTY_SYSTEM = `You are Betty Credits — a confident, sharp, street-smart financial advisor and credit strategist. You are part of the PLT (Profit Love Tax) framework created by Craig Jones.
 
 Your personality:
@@ -45,71 +44,67 @@ app.post('/chat', async (req, res) => {
   res.json({ ok: true, id });
 });
 
-// Get chat history
 app.get('/chat', (req, res) => {
   const since = parseInt(req.query.since) || 0;
   res.json(chat.filter(m => m.id > since));
 });
 
-// Betty Credits chat — powered by ChatGPT
+// Betty Credits chat — tries Anthropic first (already paid), then OpenAI
 app.post('/betty', async (req, res) => {
   const { text, history } = req.body;
   if (!text) return res.json({ ok: false, error: 'No text' });
-  if (!OPENAI_KEY) return res.json({ ok: false, error: 'Betty is offline — no API key configured' });
 
-  try {
-    const messages = [{ role: 'system', content: BETTY_SYSTEM }];
-    
-    // Add conversation history if provided
-    if (history && Array.isArray(history)) {
-      history.slice(-6).forEach(m => {
-        messages.push({ role: m.who === 'craig' ? 'user' : 'assistant', content: m.text });
-      });
-    }
-    
-    messages.push({ role: 'user', content: text });
-
-    // Try Groq first (free), fallback to OpenAI
-    const GROQ_KEY = process.env.GROQ_KEY;
-    let apiUrl, authKey, model;
-    if (GROQ_KEY) {
-      apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
-      authKey = GROQ_KEY;
-      model = 'llama-3.3-70b-versatile';
-    } else {
-      apiUrl = 'https://api.openai.com/v1/chat/completions';
-      authKey = OPENAI_KEY;
-      model = 'gpt-4o-mini';
-    }
-    
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + authKey
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_tokens: 500,
-        temperature: 0.8
-      })
+  const msgs = [];
+  if (history && Array.isArray(history)) {
+    history.slice(-6).forEach(m => {
+      msgs.push({ role: m.who === 'craig' ? 'user' : 'assistant', content: m.text });
     });
-
-    const data = await response.json();
-    
-    if (data.choices && data.choices[0]) {
-      const reply = data.choices[0].message.content;
-      res.json({ ok: true, reply });
-    } else {
-      res.json({ ok: false, error: data.error?.message || 'No response' });
-    }
-  } catch (e) {
-    res.json({ ok: false, error: e.message });
   }
+  msgs.push({ role: 'user', content: text });
+
+  // Try Anthropic first
+  if (ANTHROPIC_KEY) {
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-haiku-20241022',
+          max_tokens: 500,
+          system: BETTY_SYSTEM,
+          messages: msgs
+        })
+      });
+      const data = await r.json();
+      if (data.content && data.content[0]) {
+        return res.json({ ok: true, reply: data.content[0].text });
+      }
+    } catch (e) { /* fall through */ }
+  }
+
+  // Fallback to OpenAI
+  if (OPENAI_KEY) {
+    try {
+      const allMsgs = [{ role: 'system', content: BETTY_SYSTEM }, ...msgs];
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
+        body: JSON.stringify({ model: 'gpt-4o-mini', messages: allMsgs, max_tokens: 500, temperature: 0.8 })
+      });
+      const data = await r.json();
+      if (data.choices && data.choices[0]) {
+        return res.json({ ok: true, reply: data.choices[0].message.content });
+      }
+    } catch (e) { /* fall through */ }
+  }
+
+  res.json({ ok: false, error: 'Betty is offline — no API keys available' });
 });
 
-// Telegram webhook
 app.post('/webhook', (req, res) => {
   const msg = req.body?.message;
   if (msg && msg.from?.id == CRAIG && msg.text && !msg.text.startsWith('📱')) {
@@ -118,7 +113,6 @@ app.post('/webhook', (req, res) => {
   res.json({ ok: true });
 });
 
-// Seshat posts replies
 app.post('/reply', (req, res) => {
   const { text, secret } = req.body;
   if (secret !== (process.env.REPLY_SECRET || 'plt2026')) return res.status(403).json({ ok: false });
