@@ -69,14 +69,27 @@ app.post('/betty', async (req, res) => {
     
     messages.push({ role: 'user', content: text });
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Try Groq first (free), fallback to OpenAI
+    const GROQ_KEY = process.env.GROQ_KEY;
+    let apiUrl, authKey, model;
+    if (GROQ_KEY) {
+      apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
+      authKey = GROQ_KEY;
+      model = 'llama-3.3-70b-versatile';
+    } else {
+      apiUrl = 'https://api.openai.com/v1/chat/completions';
+      authKey = OPENAI_KEY;
+      model = 'gpt-4o-mini';
+    }
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + OPENAI_KEY
+        'Authorization': 'Bearer ' + authKey
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model,
         messages,
         max_tokens: 500,
         temperature: 0.8
