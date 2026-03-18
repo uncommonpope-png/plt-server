@@ -55,6 +55,39 @@ app.get('/wake', (req, res) => {
   res.json({ awake: true, timestamp: new Date().toISOString() });
 });
 
+// ── STRIPE CHECKOUT ──
+const stripe = process.env.STRIPE_SK ? require('stripe')(process.env.STRIPE_SK) : null;
+
+const PRODUCTS = {
+  'plt-bundle':        { name: 'PLT Framework Complete Bundle', desc: '18 books on the PLT framework', amount: 4900 },
+  'soul-profit':       { name: 'Soul Profit Guide', desc: "Entrepreneur's guide to lasting wealth", amount: 2700 },
+  'plt-calculator-pro':{ name: 'PLT Calculator Pro', desc: 'Advanced PLT decision scoring tool', amount: 1900 }
+};
+
+app.post('/checkout', async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Payments not configured' });
+  try {
+    const { product, success_url, cancel_url } = req.body;
+    const p = PRODUCTS[product];
+    if (!p) return res.status(400).json({ error: 'Unknown product' });
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{ price_data: { currency: 'usd', product_data: { name: p.name, description: p.desc }, unit_amount: p.amount }, quantity: 1 }],
+      mode: 'payment',
+      success_url: success_url || 'https://uncommonpope-png.github.io/plt-press/success.html?session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: cancel_url || 'https://uncommonpope-png.github.io/plt-press/bundle.html',
+      metadata: { product, source: 'plt-press' }
+    });
+
+    res.json({ url: session.url, id: session.id });
+  } catch (e) {
+    console.error('Checkout error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.listen(port, () => {
   console.log(`PLT Server running on port ${port}`);
+  console.log(`Stripe: ${stripe ? 'ACTIVE' : 'NOT CONFIGURED - set STRIPE_SK env var'}`);
 });
