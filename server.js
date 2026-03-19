@@ -74,6 +74,7 @@ app.get('/health', (req, res) => {
 app.post('/execute', (req, res) => {
   const { command, source, ts } = req.body || {};
   if (!command) return res.status(400).json({ error: 'command is required' });
+  // Commands are only acknowledged; nothing is executed server-side
   res.json({ ok: true, received: { command, source, ts }, message: 'Command received.' });
 });
 
