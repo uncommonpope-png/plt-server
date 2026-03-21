@@ -1,7 +1,17 @@
 const express = require('express');
 const cors = require('cors');
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (curl, server-to-server, Render health checks)
+    if (!origin) return callback(null, true);
+    if (origin === 'https://uncommonpope-png.github.io') return callback(null, true);
+    // Disallow all other origins; browser will block the response
+    callback(null, false);
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json());
 
 const port = process.env.PORT || 3000;
@@ -53,6 +63,26 @@ app.post('/betty', (req, res) => {
 // Health check
 app.get('/wake', (req, res) => {
   res.json({ awake: true, timestamp: new Date().toISOString() });
+});
+
+// ── Profitlord dashboard contract ──
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', ts: new Date().toISOString(), service: 'plt-server' });
+});
+
+app.post('/execute', (req, res) => {
+  const { command, source, ts } = req.body || {};
+  if (!command) return res.status(400).json({ error: 'command is required' });
+  // Commands are only acknowledged; nothing is executed server-side
+  res.json({ ok: true, received: { command, source, ts }, message: 'Command received.' });
+});
+
+app.post('/chat/:soul', (req, res) => {
+  const { soul } = req.params;
+  const { message, session_id } = req.body || {};
+  if (!message) return res.status(400).json({ error: 'message is required' });
+  res.json({ ok: true, soul, session_id, reply: `${soul} received: "${message}"` });
 });
 
 // ── STRIPE CHECKOUT ──
